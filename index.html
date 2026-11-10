@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WEB supabase</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f9; padding: 20px; }
+        
+        /* Estilos del Formulario */
+        .form-container {
+            background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            max-width: 600px; margin: 0 auto 30px auto; display: grid; gap: 10px;
+        }
+        input { padding: 10px; border: 1px solid #ddd; border-radius: 4px; width: 100%; box-sizing: border-box; }
+        button { padding: 10px; background-color: #3ecf8e; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        button:hover { background-color: #34b27b; }
+
+        /* Estilos de la Grilla de Tarjetas */
+        #lista {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); /* Responsivo automático */
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Estilo de cada Tarjeta */
+        .card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+            display: flex;
+            flex-direction: column;
+        }
+        .card:hover { transform: translateY(-5px); }
+
+        .card img {
+            width: 100%;
+            height: 180px;
+            object-fit: cover; /* Recorta la imagen para que llene el espacio sin deformarse */
+            background-color: #eee;
+        }
+
+        .card-content { padding: 15px; flex-grow: 1; display: flex; flex-direction: column; }
+        .card h3 { margin: 0 0 10px 0; color: #333; font-size: 1.2rem; }
+        .card p { color: #666; font-size: 0.9rem; margin-bottom: 15px; flex-grow: 1; }
+        .price { font-size: 1.2rem; color: #3ecf8e; font-weight: bold; margin-top: auto; }
+        .cat-tag { 
+            background: #eee; color: #555; padding: 4px 8px; border-radius: 4px; 
+            font-size: 0.8rem; display: inline-block; margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1 style="text-align: center;">Crud Menu</h1>
+    <h2 style="text-align: center; color: #555;">Agrega productos al menú y visualízalos en tiempo real</h2>
+    <p style="text-align: center;">Creador <a href="https://github.com/Isa696" target="_blank">Isaias Romero</a></p>
+    <p style="text-align: center;">Web creada como práctica para un proyecto del IFTS n° 16<br>Consulta las docs para entender el funcionamiento</p>
+    <!-- Formulario -->
+    <div class="form-container">
+        <input type="text" id="nombreInput" placeholder="Nombre del producto">
+        <input type="text" id="descripcionInput" placeholder="Descripción breve">
+        <input type="number" id="precioInput" placeholder="Precio ($)">
+        <input type="number" id="idCatInput" placeholder="ID Categoría (1-4)">
+        <input type="text" id="imagenInput" placeholder="URL de la imagen">
+        <button id="btnCrear">➕ Agregar al Menú</button>
+    </div>
+
+    <!-- Contenedor de Tarjetas -->
+    <div id="lista"></div>
+
+    <script type="module">
+        import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+        import { SUPABASE_URL, SUPABASE_KEY } from './env.js';
+
+        const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // --- FUNCIÓN PARA CARGAR Y MOSTRAR TARJETAS ---
+        async function cargar() {
+            const listaDiv = document.getElementById('lista');
+            listaDiv.innerHTML = "<p style='text-align:center; width:100%'>Cargando menú...</p>";
+
+            const { data, error } = await supabase.from('Menu').select('*').order('id', { ascending: false });
+
+            if (error) {
+                listaDiv.innerHTML = `<p style='color:red; text-align:center'>Error: ${error.message}</p>`;
+                return;
+            }
+
+            listaDiv.innerHTML = ""; // Limpiar loader
+
+            data.forEach(item => {
+                // Crear elemento HTML para la tarjeta
+                const card = document.createElement('div');
+                card.className = 'card';
+                
+                // Formatear precio
+                const precioFormateado = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(item.precio);
+
+                card.innerHTML = `
+                    <img src="${item.imagen}" alt="${item.nombre}" onerror="this.src='https://via.placeholder.com/300x200?text=Sin+Imagen'">
+                    <div class="card-content">
+                        <span class="cat-tag">Cat: ${item.idCat}</span>
+                        <h3>${item.nombre}</h3>
+                        <p>${item.descripcion}</p>
+                        <div class="price">${precioFormateado}</div>
+                    </div>
+                `;
+                listaDiv.appendChild(card);
+            });
+        }
+
+        // --- FUNCIÓN PARA AGREGAR ---
+        document.getElementById('btnCrear').onclick = async () => {
+            const btn = document.getElementById('btnCrear');
+            btn.textContent = "Guardando...";
+            btn.disabled = true;
+
+            const nuevoProducto = {
+                nombre: document.getElementById('nombreInput').value,
+                descripcion: document.getElementById('descripcionInput').value,
+                precio: document.getElementById('precioInput').value,
+                idCat: document.getElementById('idCatInput').value,
+                imagen: document.getElementById('imagenInput').value || 'https://via.placeholder.com/300x200'
+            };
+
+            const { error } = await supabase.from('Menu').insert([nuevoProducto]);
+
+            if (error) {
+                alert("Error: " + error.message);
+            } else {
+                // Limpiar inputs
+                document.querySelectorAll('input').forEach(input => input.value = '');
+                cargar(); // Recargar la grilla
+            }
+            
+            btn.textContent = "➕ Agregar al Menú";
+            btn.disabled = false;
+        };
+
+        // Carga inicial
+        cargar();
+    </script>
+</body>
+</html>
